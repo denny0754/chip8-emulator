@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 include_directories(vendors/)
 
-set(SOURCES main.cc)
+set(SOURCES main.cpp chip8.cpp debug/disassembler.cpp)
 
 add_executable(CHIP8Emulator ${SOURCES})
 link_directories("libs/")

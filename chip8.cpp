@@ -9,12 +9,13 @@
  * (C) Sochima Biereagu, 2019
 */
 
-#include "chip8.h"
+#include "chip8.hpp"
 #include <vector>
 #include <algorithm>
 #include <fstream>
 #include <limits>
 #include <sstream>
+#include <random>
 
 mt19937 rnd{};
 
@@ -39,10 +40,12 @@ static std::array<byte, 80> CHIP8_FONTS =
 };
 
 // init
-Chip8::Chip8() {
+Chip8::Chip8()
+{
 
 	// load fonts into memory
 	std::copy(CHIP8_FONTS.begin(), CHIP8_FONTS.end(), m_Memory.begin());
+	m_Screen.fill(0);
 }
 
 /*
@@ -115,9 +118,9 @@ bool Chip8::load_program(const std::string file)
  *
  * See chip8 instruction set at http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#3.1
  */
-void Chip8::emulate_op() {
-	#define not_handled(m,l)\
-		printf("\nUnrecognized instruction: %04x %04x\n", m,l); exit(2);
+void Chip8::emulate_op()
+{
+	#define not_handled(m,l) printf("\nUnrecognized instruction: %04x %04x\n", m,l); exit(2);
 
 	int tmp;
 	int opcode = (m_Memory[PC] << 8) | m_Memory[PC+1];
@@ -142,7 +145,7 @@ void Chip8::emulate_op() {
 			switch (lsb&0xf) {
 				// 0x00e0
 				case 0x0: // clr
-					memset(screen, 0, 2048);
+					m_Screen.fill(0);
 					redraw = true;
 					PC += 2;
 					break;
@@ -311,7 +314,7 @@ void Chip8::emulate_op() {
 					px = (Vx + w) % 64;
 
 					if (*row_pixels & (0b10000000 >> w)) { // checks if (8-w)'th bit is set
-						byte &pixel = screen[64*py + px];
+						byte &pixel = m_Screen[64*py + px];
 
 						VF = (pixel == 1),
 						pixel ^= 1;

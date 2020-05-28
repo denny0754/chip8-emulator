@@ -4,8 +4,8 @@
  * (C) Sochima Biereagu, 2019
 */
 
-#include "chip8.cc"
-#include "debug/disassembler.cc" // for debugging
+#include "chip8.hpp"
+// #include "debug/disassembler.cc" // for debugging
 
 #include "SDL2/SDL.h"
 #undef main
@@ -23,11 +23,13 @@ const int W = w*16, H = h*16;
 uint32_t pixels[w * h];
 
 // render screen in RGB buffer
-void renderTo(uint32_t* pixels, const byte* screen) {
+void renderTo(uint32_t* pixels, const std::array<byte, 2048>& screen)
+{
 	for (int i = 0; i < w * h; ++i)
+	{
 		pixels[i] = (0x0033FF66 * screen[i]) | 0xFF111111;
+	}
 }
-
 
 static deque<pair<unsigned,bool>> AudioQueue;
 
@@ -173,7 +175,7 @@ int main(int argc, char** argv) {
 			/////////////////////
 			// Render graphics //
 			if (cpu.redraw) {
-				renderTo(pixels, cpu.screen);
+				renderTo(pixels, cpu.m_Screen);
 				SDL_UpdateTexture(texture, nullptr, pixels, 4*w);
 				SDL_RenderClear(renderer);
 				SDL_RenderCopy(renderer, texture, nullptr, nullptr);
@@ -184,7 +186,9 @@ int main(int argc, char** argv) {
 		}
 
 		if (!paused)
+		{
 			this_thread::sleep_for(chrono::microseconds(1300));
+		}
 	}
 
 	return 0;

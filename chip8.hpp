@@ -4,8 +4,7 @@
 #include <ios>
 #include <random>
 #include <cstdio>
-#include <string.h>
-#include <stdint.h>
+#include <string>
 #include <iostream>
 
 #include <thread>
@@ -45,9 +44,9 @@ public:
 	bool key_pressed[16] = {0};
 	byte awaitingKey = 0;
 
-	byte screen[64*32] = {0};
+	std::array<byte, 2048> m_Screen;
 
-	bool redraw;					// draw flag
+	bool redraw; // draw flag
 
 	void emulate_op();
 	bool load_program (const std::string path);
