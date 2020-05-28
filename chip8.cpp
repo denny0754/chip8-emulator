@@ -44,7 +44,7 @@ Chip8::Chip8()
 
 	// load fonts into memory
 	std::copy(CHIP8_FONTS.begin(), CHIP8_FONTS.end(), m_Memory.begin());
-	m_Screen.fill(0);
+	m_VideoMemory.fill(0);
 }
 
 /*
@@ -83,14 +83,14 @@ bool Chip8::load_program(const std::string file)
 	program_size = GetFileSize(file);
 	if(!program_size)
 	{
-		std::cout << "Error: Program file `" << file << "` is empty.\n";
+		std::cerr << "Error: Program file `" << file << "` is empty.\n";
 		return false;
 	}
 
 	std::fstream file_buffer = std::fstream(file, std::ios::in | std::ios::binary);
 	if (!file_buffer.good()) 
 	{
-		std::cout << "Error: Couldn't open `" << file << "`\n";
+		std::cerr << "Error: Couldn't open `" << file << "`\n";
 		return false;
 	}
 
@@ -121,7 +121,7 @@ void Chip8::emulate_op()
 {
 	#define not_handled(m,l) printf("\nUnrecognized instruction: %04x %04x\n", m,l); exit(2);
 	
-	mt19937 rnd{};
+	std::mt19937 rnd{};
 
 	int tmp;
 	int opcode = (m_Memory[PC] << 8) | m_Memory[PC+1];
@@ -146,8 +146,8 @@ void Chip8::emulate_op()
 			switch (lsb&0xf) {
 				// 0x00e0
 				case 0x0: // clr
-					m_Screen.fill(0);
-					redraw = true;
+					m_VideoMemory.fill(0);
+					m_ShouldRedraw = true;
 					PC += 2;
 					break;
 
@@ -291,7 +291,7 @@ void Chip8::emulate_op()
 
 		// 0xCxkk
 		case 0xC: // rnd Vx, kk
-			Vx = uniform_int_distribution<>(0, 255)(rnd) & kk;
+			Vx = std::uniform_int_distribution<>(0, 255)(rnd) & kk;
 			PC += 2;
 			break;
 
@@ -315,7 +315,7 @@ void Chip8::emulate_op()
 					px = (Vx + w) % 64;
 
 					if (*row_pixels & (0b10000000 >> w)) { // checks if (8-w)'th bit is set
-						byte &pixel = m_Screen[64*py + px];
+						byte &pixel = m_VideoMemory[64*py + px];
 
 						VF = (pixel == 1),
 						pixel ^= 1;
@@ -323,7 +323,7 @@ void Chip8::emulate_op()
 				}
 				++row_pixels;
 			}
-			redraw = true;
+			m_ShouldRedraw = true;
 			PC += 2;
 		}
 		break;
@@ -333,13 +333,13 @@ void Chip8::emulate_op()
 			switch (lsb) {
 				// 0xE9E
 				case 0x9E: // jkey Vx
-					if (key_pressed[Vx]) PC += 2;
+					if (m_KeyPressed[Vx]) PC += 2;
 					PC += 2;
 					break;
 
 				// 0xA1
 				case 0xA1: // jnkey Vx
-					if (!key_pressed[Vx]) PC += 2;
+					if (!m_KeyPressed[Vx]) PC += 2;
 					PC += 2;
 					break;
 			}
@@ -351,25 +351,25 @@ void Chip8::emulate_op()
 			switch (lsb) {
 				// 0xFx07
 				case 0x07: // getdelay Vx
-					Vx = DT;
+					Vx = m_DelayTimer;
 					PC += 2;
 					break;
 
 				// 0xFx0A
 				case 0x0A: // waitkey Vx
-					awaitingKey = 0x80 | x;
+					m_AwaitingKey = 0x80 | x;
 					PC += 2;
 					break;
 
 				// 0xFx15
 				case 0x15: // setdelay Vx
-					DT = Vx;
+					m_DelayTimer = Vx;
 					PC += 2;
 					break;
 
 				// 0xFx18
 				case 0x18: // setsound Vx
-					ST = Vx;
+					m_SoundTimer = Vx;
 					PC += 2;
 					break;
 
@@ -431,4 +431,16 @@ void Chip8::emulate_op()
 	}
 	#undef not_handled
 
+}
+
+
+
+void Chip8::SetDelayTimer(const byte& dt)
+{
+	m_DelayTimer = dt;
+}
+
+void Chip8::SetSoundTimer(const byte& st)
+{
+	m_SoundTimer = st;
 }

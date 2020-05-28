@@ -9,7 +9,7 @@
 #include <SDL2/SDL.h>
 #include <cxxopts/cxxopts.hpp>
 
-string getfilename(string);
+std::string getfilename(const std::string& filepath);
 
 
 // chip8 screen size
@@ -30,7 +30,7 @@ void renderTo(uint32_t* pixels, const std::array<byte, 2048>& screen)
 	}
 }
 
-static deque<pair<unsigned,bool>> AudioQueue;
+static std::deque<std::pair<unsigned,bool>> AudioQueue;
 
 
 #undef main
@@ -127,14 +127,14 @@ int main(int argc, char** argv)
 		 paused = false;
 
 
-	auto start = chrono::system_clock::now();
+	auto start = std::chrono::system_clock::now();
 
 	while (running)
 	{
 		/////////////////////////
 		// Execute Instruction //
 		/////////////////////////
-		if (!emulator.awaitingKey && !paused)
+		if (!emulator.GetAwaitingKey() && !paused)
 			// if not waiting for input nor paused
 			emulator.emulate_op();
 
@@ -171,11 +171,12 @@ int main(int argc, char** argv)
 						break;
 					}
 
-					emulator.key_pressed[key->second] = (ev.type == SDL_KEYDOWN);
+					emulator.SetKeyPressed(key->second, (ev.type == SDL_KEYDOWN));
 
-					if(ev.type==SDL_KEYDOWN && emulator.awaitingKey) {
-						emulator.V[emulator.awaitingKey & 0x7f] = key->second;
-						emulator.awaitingKey = 0;
+					if(ev.type==SDL_KEYDOWN && emulator.GetAwaitingKey())
+					{
+						emulator.V[emulator.GetAwaitingKey() & 0x7f] = key->second;
+						emulator.SetAwaitingKey(0);
 					}
 				}
 			}
@@ -184,17 +185,19 @@ int main(int argc, char** argv)
 		//////////////
 		// Render  //
 		/////////////
-		auto cur = chrono::system_clock::now();
+		auto cur = std::chrono::system_clock::now();
 
-		chrono::duration<double> elapsed_seconds = cur-start;
+		std::chrono::duration<double> elapsed_seconds = cur-start;
 		int frames = int(elapsed_seconds.count() * 60) - frames_done;
 
 		if (frames > 0 && !paused) {
 			frames_done += frames;
 
             // Update the timer registers
-            int st = min<int>(frames, emulator.ST); emulator.ST -= st;
-            int dt = min<int>(frames, emulator.DT); emulator.DT -= dt;
+            int st = std::min<int>(frames, emulator.GetSoundTimer());
+			emulator.SetSoundTimer(emulator.GetSoundTimer() - st);
+			int dt = std::min<int>(frames, emulator.GetDelayTimer());
+			emulator.SetDelayTimer(emulator.GetDelayTimer() - dt);
 
             //////////////////
             // Render audio //
@@ -205,20 +208,20 @@ int main(int argc, char** argv)
 
 			/////////////////////
 			// Render graphics //
-			if (emulator.redraw) {
-				renderTo(pixels, emulator.m_Screen);
+			if (emulator.ShouldRedraw()) {
+				renderTo(pixels, emulator.GetVideoMemory());
 				SDL_UpdateTexture(texture, nullptr, pixels, 4*w);
 				SDL_RenderClear(renderer);
 				SDL_RenderCopy(renderer, texture, nullptr, nullptr);
 				SDL_RenderPresent(renderer);
 
-				emulator.redraw = false;
+				emulator.StopDrawing();
 			}
 		}
 
 		if (!paused)
 		{
-			this_thread::sleep_for(chrono::microseconds(1300));
+			std::this_thread::sleep_for(std::chrono::microseconds(1300));
 		}
 	}
 
@@ -229,8 +232,8 @@ int main(int argc, char** argv)
 /**
  * get filename from filepath
  */
-string getfilename(const string filepath) {
-	string filename = filepath;
+std::string getfilename(const std::string& filepath) {
+	std::string filename = filepath;
 
 	// Remove directory if present.
 	// Do this before extension removal incase directory has a period character.

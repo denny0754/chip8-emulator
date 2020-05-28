@@ -13,13 +13,13 @@ its just used for debugging purpose.
 */
 
 
-string decode (int, byte, byte);
+std::string decode (int, byte, byte);
 
 
-string Chip8::disassemble() {
+std::string Chip8::disassemble() {
 
 	byte lsb, msb;
-	string str = "";
+	std::string str = "";
 
 	for (int i=PC; i < (PC + program_size); i+=2) {
 		msb = m_Memory[i], lsb = m_Memory[i+1];
@@ -37,10 +37,10 @@ string Chip8::disassemble() {
 
 
 // decode instruction
-string decode(int i, byte msb, byte lsb) {
+std::string decode(int i, byte msb, byte lsb) {
 	char ln[20];
 	sprintf(ln, "%04x:  %02x %02x  =>  ", i, msb, lsb);
-	string str = ln;
+	std::string str = ln;
 
 	byte nib = msb >> 4;
 

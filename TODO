@@ -1,0 +1,13 @@
+ToDo:
+    ✔ In `main.cc` we should include the header file, not the `.cc` file. @done(20-05-28 19:15)
+    ✔ Source files should end with the `.cpp` extension instead of the `.cc` one. @done(20-05-28 19:15)
+    ☐ Pulic members of `Chip8` class should be private. For some we would need to create a Getter or a Setter or both. @started(20-05-28 19:36)
+    ☐ Consider moving all registers of the `Chip8` into an array of registers(i.e. an `std::array` of `word`).
+    ☐ Use SFML, which is more C++ friendly then SDL.
+    ☐ Consider moving all `Chip8` operations/instructions into some form of methods. `emulate_op` is too long of a method. A map of `int` to `std::function` should do the job.
+    ☐ Methods found in `disasseble.cpp` should be moved onto a single file, i.e. `chip8.cpp`.
+    ☐ Consider using an independed video memory interface with methods used to access the video ram.
+    ☐ Replace c-style array with c++ `std::array`.
+    ☐ Consider making function `decode` found in `disassembled.cpp` a method of the `Chip8` class.
+    ☐ Use the faster library `spdlog` to log error/debug/info messages instead of `cout` or `cerr`.
+    ☐ Add source and header documentation.
