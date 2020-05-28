@@ -17,7 +17,6 @@
 #include <sstream>
 #include <random>
 
-mt19937 rnd{};
 
 static std::array<byte, 80> CHIP8_FONTS =
 {
@@ -121,12 +120,14 @@ bool Chip8::load_program(const std::string file)
 void Chip8::emulate_op()
 {
 	#define not_handled(m,l) printf("\nUnrecognized instruction: %04x %04x\n", m,l); exit(2);
+	
+	mt19937 rnd{};
 
 	int tmp;
 	int opcode = (m_Memory[PC] << 8) | m_Memory[PC+1];
 	int msb = opcode>>8, lsb = opcode&0xff;
 
-    // printf("(%x) %x %x | pc = %x\n", opcode, memory[PC], memory[PC+1], PC);
+    // printf("(%x) %x %x | pc = %x\n", opcode, m_Memory[PC], m_Memory[PC+1], PC);
 
 	// Get bit-fields from instruction/opcode
 	int u   = (opcode>>12) & 0xF,

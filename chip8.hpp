@@ -25,7 +25,6 @@ using word = uint16_t;	// 16bits
 class Chip8 {
 private:
 	std::array<byte, 4096> m_Memory;
-	// byte memory[4*1024] = {0};		// 4KB RAM
 
 	word I = 0;						// Index register
 	word PC = 0x200;				// Program Counter / Instruction pointer
@@ -46,7 +45,7 @@ public:
 
 	std::array<byte, 2048> m_Screen;
 
-	bool redraw; // draw flag
+	bool redraw;					 // draw flag
 
 	void emulate_op();
 	bool load_program (const std::string path);

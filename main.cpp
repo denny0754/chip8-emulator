@@ -4,11 +4,10 @@
  * (C) Sochima Biereagu, 2019
 */
 
+#include <iostream>
 #include "chip8.hpp"
-// #include "debug/disassembler.cc" // for debugging
-
-#include "SDL2/SDL.h"
-#undef main
+#include <SDL2/SDL.h>
+#include <cxxopts/cxxopts.hpp>
 
 string getfilename(string);
 
@@ -34,46 +33,64 @@ void renderTo(uint32_t* pixels, const std::array<byte, 2048>& screen)
 static deque<pair<unsigned,bool>> AudioQueue;
 
 
-int main(int argc, char** argv) {
-	if (argc < 2)
+#undef main
+int main(int argc, char** argv)
+{
+	// Using library `cxxopts` to parse arguments passed to the program.
+	cxxopts::Options options("Chip8 Emulator", "An emulator for the Chip8.");
+
+	options.add_options()
+        ("f,file", "Block Size of the Disk(In Kilobytes - Minumum is 512)", cxxopts::value<std::string>())
+        ("d,decode", "Size of the Disk in MB(MegaBytes)", cxxopts::value<bool>()->default_value("false"))
+		("h,help", "Prints this.");
+
+	auto arg_result = options.parse(argc, argv);
+
+	Chip8 emulator = Chip8();
+
+	// We need at least a ROM file to start the emulator.
+	if(arg_result.count("help") || arg_result.arguments().empty())
 	{
-		std::cout << "Command usage:\n ./chip8 <program>\n ./chip8 --decode <program>" << std::endl;
-		return 1;
+		std::cout << options.help() << std::endl;
+		exit(0);
 	}
 
-	Chip8 cpu = Chip8();
+	std::string file_path = std::string();
+	bool decode_rom = false;
 
-	string arg1 = string(argv[1]);
-	if (arg1 == "--decode") {
-		// load/decode program
-		if (argc < 3) std::cout << "Command usage:\n ./chip8 <program>\n ./chip8 --decode <program>" << std::endl;;
-		cpu.load_program(argv[2]);
+	try
+	{
+		file_path = arg_result["file"].as<std::string>();
+		decode_rom = arg_result["decode"].as<bool>();
+	}catch(...) {  }
 
-		cout << cpu.disassemble();
-		return 0;
+	if(!file_path.empty() && !emulator.load_program(file_path))
+	{
+		std::cerr << "Couldn't load ROM `" << file_path << "`.\n";
+		exit(-1);
 	}
-	else {
-		// load program
-		if (!cpu.load_program(arg1)) exit(1);
+	if(decode_rom)
+	{
+		std::cout << emulator.disassemble();
 	}
 
-	printf("\nPress P to pause emulation.\n");
+	std::cout << "\nPress P to pause emulation.\n";
 
 
 	/////////
 	// GUI //
 	/////////
 
-	string filename = getfilename(arg1);
+	std::string filename = getfilename(file_path);
 
 	// create window
-	string title = "Chip8 Emulator - " + filename;
+	std::string title = "Chip8 Emulator - " + filename;
 	SDL_Window* window = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, W, H, SDL_WINDOW_RESIZABLE);
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0); SDL_RenderSetLogicalSize(renderer, W, H);
 	SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
 
 	// mapping of SDL keyboard symbols to chip8 keypad codes
-	unordered_map<int,int> keymap{
+	std::unordered_map<int,int> keymap{
 		{SDLK_1, 0x1}, {SDLK_2, 0x2}, {SDLK_3, 0x3}, {SDLK_4, 0xC},
 		{SDLK_q, 0x4}, {SDLK_w, 0x5}, {SDLK_e, 0x6}, {SDLK_r, 0xD},
 		{SDLK_a, 0x7}, {SDLK_s, 0x8}, {SDLK_d, 0x9}, {SDLK_f, 0xE},
@@ -90,10 +107,13 @@ int main(int argc, char** argv) {
 	spec.samples  = spec.freq/20;
 	spec.callback = [](void*, Uint8* stream, int len) {
 		short* target = (short*)stream;
-		while(len > 0 && !AudioQueue.empty()) {
+		while(len > 0 && !AudioQueue.empty())
+		{
 			auto& data = AudioQueue.front();
 			for(; len && data.first; target += 2, len -= 4, --data.first)
+			{
 				target[0] = target[1] = data.second*300*((len&128)-64);
+			}
 			if(!data.first) AudioQueue.pop_front();
 		}
 	};
@@ -108,14 +128,15 @@ int main(int argc, char** argv) {
 
 
 	auto start = chrono::system_clock::now();
-	while (running) {
 
+	while (running)
+	{
 		/////////////////////////
 		// Execute Instruction //
 		/////////////////////////
-		if (!cpu.awaitingKey && !paused)
+		if (!emulator.awaitingKey && !paused)
 			// if not waiting for input nor paused
-			cpu.emulate_op();
+			emulator.emulate_op();
 
 		if (paused && !msg) {
 			printf("\nPaused\n");
@@ -126,31 +147,41 @@ int main(int argc, char** argv) {
 		// Process events //
 		////////////////////
 		for(SDL_Event ev; SDL_PollEvent(&ev); )
+		{
 			switch(ev.type)
 			{
-				case SDL_QUIT: running = 0; break;
+				case SDL_QUIT:
+				{
+					running = 0;
+					break;
+				}
 				case SDL_KEYDOWN:
 				case SDL_KEYUP:
-					auto i = keymap.find(ev.key.keysym.sym);
+				{
+					auto key = keymap.find(ev.key.keysym.sym);
 
-					if (i == keymap.end()) break;
-					if (i->second == -1) { running = 0; break; }
-					if (i->second == -2 && ev.type==SDL_KEYDOWN) {
+					if (key == keymap.end()) break;
+					if (key->second == -1) { running = 0; break; }
+					if (key->second == -2 && ev.type==SDL_KEYDOWN) {
 						paused=!paused, msg=0;
-						if (!paused) printf("Resumed\n");
+						if (!paused)
+						{
+							std::cout << "Resumed\n";
+						}
 						break;
 					}
 
-					cpu.key_pressed[i->second] = (ev.type == SDL_KEYDOWN);
+					emulator.key_pressed[key->second] = (ev.type == SDL_KEYDOWN);
 
-					if(ev.type==SDL_KEYDOWN && cpu.awaitingKey) {
-						cpu.V[cpu.awaitingKey & 0x7f] = i->second;
-						cpu.awaitingKey = 0;
+					if(ev.type==SDL_KEYDOWN && emulator.awaitingKey) {
+						emulator.V[emulator.awaitingKey & 0x7f] = key->second;
+						emulator.awaitingKey = 0;
 					}
+				}
 			}
+		}
 
-
-		/////////////
+		//////////////
 		// Render  //
 		/////////////
 		auto cur = chrono::system_clock::now();
@@ -162,8 +193,8 @@ int main(int argc, char** argv) {
 			frames_done += frames;
 
             // Update the timer registers
-            int st = min<int>(frames, cpu.ST); cpu.ST -= st;
-            int dt = min<int>(frames, cpu.DT); cpu.DT -= dt;
+            int st = min<int>(frames, emulator.ST); emulator.ST -= st;
+            int dt = min<int>(frames, emulator.DT); emulator.DT -= dt;
 
             //////////////////
             // Render audio //
@@ -174,14 +205,14 @@ int main(int argc, char** argv) {
 
 			/////////////////////
 			// Render graphics //
-			if (cpu.redraw) {
-				renderTo(pixels, cpu.m_Screen);
+			if (emulator.redraw) {
+				renderTo(pixels, emulator.m_Screen);
 				SDL_UpdateTexture(texture, nullptr, pixels, 4*w);
 				SDL_RenderClear(renderer);
 				SDL_RenderCopy(renderer, texture, nullptr, nullptr);
 				SDL_RenderPresent(renderer);
 
-				cpu.redraw = false;
+				emulator.redraw = false;
 			}
 		}
 
