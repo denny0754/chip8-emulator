@@ -22,7 +22,7 @@ string Chip8::disassemble() {
 	string str = "";
 
 	for (int i=PC; i < (PC + program_size); i+=2) {
-		msb = memory[i], lsb = memory[i+1];
+		msb = m_Memory[i], lsb = m_Memory[i+1];
 
 		str += decode(i, msb, lsb) + "\n";
 	}

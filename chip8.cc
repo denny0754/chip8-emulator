@@ -10,38 +10,100 @@
 */
 
 #include "chip8.h"
+#include <vector>
+#include <algorithm>
+#include <fstream>
+#include <limits>
+#include <sstream>
 
 mt19937 rnd{};
 
+static std::array<byte, 80> CHIP8_FONTS =
+{
+	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+	0x20, 0x60, 0x20, 0x20, 0x70, // 1
+	0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+	0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+	0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+	0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+	0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+	0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+	0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+	0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+	0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+	0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+	0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+	0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+	0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+	0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+};
+
+// init
+Chip8::Chip8() {
+
+	// load fonts into memory
+	std::copy(CHIP8_FONTS.begin(), CHIP8_FONTS.end(), m_Memory.begin());
+}
+
+/*
+
+	static std::size_t GetFileSize
+
+	Param const std::string& path: Path to the file.
+
+	Returns the size of the given file.
+	If the file can't be opened(not enough permissios) 0 is returned.
+	Otherwise, its size is returned.
+
+*/
+static std::size_t GetFileSize(const std::string& path)
+{
+	std::ifstream file_buffer = std::ifstream(path,std::ios::in|std::ios::binary);
+	if(!file_buffer.good())
+	{
+		return 0;
+	}
+
+	file_buffer.ignore( std::numeric_limits<std::streamsize>::max() );
+	std::streamsize length = file_buffer.gcount();
+	file_buffer.clear();   //  Since ignore will have set eof.
+	file_buffer.seekg( 0, std::ios_base::beg );
+	file_buffer.close();
+
+	return length;
+}
 
 /**
  * Load ROM into memory
  */
-bool Chip8::load_program(string file) {
-	FILE *f = fopen(file.c_str(), "rb");
-
-	if (f == NULL) 
-		return printf("Error: Couldn't open '%s'\n", file.c_str()), false;
-
-	// get file size
-	fseek(f, 0L, SEEK_END);
-	program_size = ftell(f);
-	fseek(f, 0L, SEEK_SET);
-
-	// allocate memory for ROM (buffer)
-	byte* rom = (byte*) malloc(sizeof(byte) * program_size);
-
-	// read program into buffer
-	fread(rom, sizeof(byte), program_size, f);
-
-	// load program from buffer into memory
-	for (int i=PC, j=0; i < int(PC + program_size); ++i, ++j) {
-		memory[i] = rom[j];
+bool Chip8::load_program(const std::string file)
+{
+	program_size = GetFileSize(file);
+	if(!program_size)
+	{
+		std::cout << "Error: Program file `" << file << "` is empty.\n";
+		return false;
 	}
 
-	free(rom);
-	fclose(f);
+	std::fstream file_buffer = std::fstream(file, std::ios::in | std::ios::binary);
+	if (!file_buffer.good()) 
+	{
+		std::cout << "Error: Couldn't open `" << file << "`\n";
+		return false;
+	}
 
+	// read program into buffer
+	std::stringstream sbuffer;
+	sbuffer << file_buffer.rdbuf();
+	std::string bstr = sbuffer.str();
+	
+	// load program from buffer into memory
+	for(std::size_t i = 0; i < program_size; i++)
+	{
+		m_Memory[i + PC] = (byte)bstr[i];
+	}
+
+	file_buffer.close();
 	return true;
 }
 
@@ -58,7 +120,7 @@ void Chip8::emulate_op() {
 		printf("\nUnrecognized instruction: %04x %04x\n", m,l); exit(2);
 
 	int tmp;
-	int opcode = (memory[PC] << 8) | memory[PC+1];
+	int opcode = (m_Memory[PC] << 8) | m_Memory[PC+1];
 	int msb = opcode>>8, lsb = opcode&0xff;
 
     // printf("(%x) %x %x | pc = %x\n", opcode, memory[PC], memory[PC+1], PC);
@@ -239,7 +301,7 @@ void Chip8::emulate_op() {
 			*/
 			byte width = 8,
 				height = n,
-				*row_pixels = &memory[I];
+				*row_pixels = &m_Memory[I];
 
 			int px, py;
 			for (int h = 0; h < height; ++h) {
@@ -328,13 +390,13 @@ void Chip8::emulate_op() {
 					b = tmp%10, tmp/=10;
 					a = tmp;
 
-					memory[I] = a, memory[I+1] = b, memory[I+2] = c;
+					m_Memory[I] = a, m_Memory[I+1] = b, m_Memory[I+2] = c;
 					PC += 2;
 					break;
 
 				// 0xFx55
 				case 0x55: { // mov [I], V0-VF
-					byte *memv = &memory[I];
+					byte *memv = &m_Memory[I];
 
 					for (int p = 0; p <= x; ++p)
 						*(memv++) = V[p];
@@ -345,7 +407,7 @@ void Chip8::emulate_op() {
 
 				// 0xFx65
 				case 0x65: { // mov V0-VF, [I]
-					byte *memv = &memory[I];
+					byte *memv = &m_Memory[I];
 
 					for (int p = 0; p <= x; ++p)
 						V[p] = *(memv++);
