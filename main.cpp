@@ -175,7 +175,7 @@ int main(int argc, char** argv)
 
 					if(ev.type==SDL_KEYDOWN && emulator.GetAwaitingKey())
 					{
-						emulator.V[emulator.GetAwaitingKey() & 0x7f] = key->second;
+						emulator.SetGeneralRegister((GeneralRegisters)(emulator.GetAwaitingKey() & 0x7f), key->second);
 						emulator.SetAwaitingKey(0);
 					}
 				}

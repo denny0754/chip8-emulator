@@ -45,6 +45,10 @@ Chip8::Chip8()
 	// load fonts into memory
 	std::copy(CHIP8_FONTS.begin(), CHIP8_FONTS.end(), m_Memory.begin());
 	m_VideoMemory.fill(0);
+	m_GeneralRegisters.fill(0);
+	m_InternalRegisters.fill(0);
+	m_InternalRegisters[InternalRegisters::PC] = 0x200;
+	m_Stack.fill(0);
 }
 
 /*
@@ -102,7 +106,7 @@ bool Chip8::load_program(const std::string file)
 	// load program from buffer into memory
 	for(std::size_t i = 0; i < program_size; i++)
 	{
-		m_Memory[i + PC] = (byte)bstr[i];
+		m_Memory[i + m_InternalRegisters[InternalRegisters::PC]] = (byte)bstr[i];
 	}
 
 	file_buffer.close();
@@ -124,21 +128,23 @@ void Chip8::emulate_op()
 	std::mt19937 rnd{};
 
 	int tmp;
-	int opcode = (m_Memory[PC] << 8) | m_Memory[PC+1];
+	int opcode = (m_Memory[m_InternalRegisters[InternalRegisters::PC]] << 8) | m_Memory[m_InternalRegisters[InternalRegisters::PC]+1];
 	int msb = opcode>>8, lsb = opcode&0xff;
 
-    // printf("(%x) %x %x | pc = %x\n", opcode, m_Memory[PC], m_Memory[PC+1], PC);
+    // printf("(%x) %x %x | m_Registers[Chip8Registers::PC] = %x\n", opcode, m_Memory[m_Registers[Chip8Registers::PC]], m_Memory[m_Registers[Chip8Registers::PC]+1], m_Registers[Chip8Registers::PC]);
 
 	// Get bit-fields from instruction/opcode
-	int u   = (opcode>>12) & 0xF,
-		x   = (opcode>>8) & 0xF,
-		y   = (opcode>>4) & 0xF,
-		kk  = (opcode) & 0xFF,
-		n   = (opcode) & 0xF,
-		nnn = (opcode) & 0xFFF;
+	int u   = (opcode>>12) & 0xF;
+	int x   = (opcode>>8) & 0xF;
+	int y   = (opcode>>4) & 0xF;
+	int kk  = (opcode) & 0xFF;
+	int n   = (opcode) & 0xF;
+	int nnn = (opcode) & 0xFFF;
 
 	// alliases for common registers
-	byte &Vx = V[x], &Vy = V[y], &VF = V[0xF];
+	byte &Vx = m_GeneralRegisters[x];
+	byte &Vy = m_GeneralRegisters[y];
+	byte &VF = m_GeneralRegisters[0xF];
 
 	switch (msb >> 4) {
 		// 0x0e-
@@ -148,12 +154,12 @@ void Chip8::emulate_op()
 				case 0x0: // clr
 					m_VideoMemory.fill(0);
 					m_ShouldRedraw = true;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x00ee
 				case 0xe: // ret
-					PC = stack[--sp] + 2;
+					m_InternalRegisters[InternalRegisters::PC] = m_Stack[--m_InternalRegisters[InternalRegisters::SP]] + 2;
 					break;
 
 				default:
@@ -164,43 +170,43 @@ void Chip8::emulate_op()
 
 		// 0x1nnn
 		case 0x1: // jmp nnn
-			PC = nnn;
+			m_InternalRegisters[InternalRegisters::PC] = nnn;
 			break;
 
 		// 0x2nnn
 		case 0x2: // call nnn
-			stack[sp++] = PC;
-			PC = nnn;
+			m_Stack[m_InternalRegisters[InternalRegisters::SP]++] = m_InternalRegisters[InternalRegisters::PC];
+			m_InternalRegisters[InternalRegisters::PC] = nnn;
 			break;
 
 		// 03xkk
 		case 0x3: // jeq Vx, Vkk
-			if (Vx == kk) PC += 2;
-			PC += 2;
+			if (Vx == kk) m_InternalRegisters[InternalRegisters::PC] += 2;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 			break;
 
 		// 0x4xkk
 		case 0x4: //jneq Vx, Vkk
-			if (Vx != kk) PC += 2;
-			PC += 2;
+			if (Vx != kk) m_InternalRegisters[InternalRegisters::PC] += 2;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 			break;
 
 		// 0x5xy0
 		case 0x5: // jeqr Vx, Vy
-			if (Vx == Vy) PC += 2;
-			PC += 2;
+			if (Vx == Vy) m_InternalRegisters[InternalRegisters::PC] += 2;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 			break;
 
 		// 0x6xkk
 		case 0x6: // mov Vx, kk
 			Vx = kk;
-			PC += 2;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 			break;
 
 		// 0x7xkk
 		case 0x7: // add Vx, kk
             Vx += kk;
-			PC += 2;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 			break;
 
 		// 0x8xyn
@@ -209,25 +215,25 @@ void Chip8::emulate_op()
 				// 0x8xy0
 				case 0x0: // mov Vx, Vy
 					Vx = Vy;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x8xy1
 				case 0x1: // or Vx, Vy
 					Vx |= Vy;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x8xy2
 				case 0x2: // and Vx, Vy
 					Vx &= Vy;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x8xy3
 				case 0x3: // xor Vx, Vy
 					Vx ^= Vy;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x8xy4
@@ -235,35 +241,35 @@ void Chip8::emulate_op()
 					tmp = Vx + Vy;
 					VF = (tmp > 0xff);
 					Vx += Vy;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x8xy5
 				case 0x5: // sub Vx, Vy
 					VF = Vx > Vy;
 					Vx -= Vy;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x8xy6
 				case 0x6: // shr Vx
 					VF = Vx&1;
 					Vx >>= 1;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x8xy7
 				case 0x7: // subb Vy, Vx
 					VF = Vy > Vx;
 					Vy -= Vx;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0x8ye
 				case 0xe: // shl Vx
 					VF = Vx >> 7;
 					Vx <<= 1;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				default:
@@ -274,25 +280,25 @@ void Chip8::emulate_op()
 
 		// 9xy0
 		case 0x9: // jneqr Vx, Vy
-			if (Vx != Vy) PC += 2;
-			PC += 2;
+			if (Vx != Vy) m_InternalRegisters[InternalRegisters::PC] += 2;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 			break;
 
 		// Annn
 		case 0xA: // mov I, nnn
-			I = nnn;
-			PC += 2;
+			m_InternalRegisters[InternalRegisters::IR] = nnn;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 			break;
 
 		// 0xBnnn
 		case 0xB: // jmp V0+nnn
-			PC = V[0] + nnn;
+			m_InternalRegisters[InternalRegisters::PC] = m_GeneralRegisters[GeneralRegisters::R0] + nnn;
 			break;
 
 		// 0xCxkk
 		case 0xC: // rnd Vx, kk
 			Vx = std::uniform_int_distribution<>(0, 255)(rnd) & kk;
-			PC += 2;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 			break;
 
 		// 0xDxyn
@@ -305,7 +311,7 @@ void Chip8::emulate_op()
 			*/
 			byte width = 8,
 				height = n,
-				*row_pixels = &m_Memory[I];
+				*row_pixels = &m_Memory[m_InternalRegisters[InternalRegisters::IR]];
 
 			int px, py;
 			for (int h = 0; h < height; ++h) {
@@ -324,7 +330,7 @@ void Chip8::emulate_op()
 				++row_pixels;
 			}
 			m_ShouldRedraw = true;
-			PC += 2;
+			m_InternalRegisters[InternalRegisters::PC] += 2;
 		}
 		break;
 
@@ -333,14 +339,14 @@ void Chip8::emulate_op()
 			switch (lsb) {
 				// 0xE9E
 				case 0x9E: // jkey Vx
-					if (m_KeyPressed[Vx]) PC += 2;
-					PC += 2;
+					if (m_KeyPressed[Vx]) m_InternalRegisters[InternalRegisters::PC] += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0xA1
 				case 0xA1: // jnkey Vx
-					if (!m_KeyPressed[Vx]) PC += 2;
-					PC += 2;
+					if (!m_KeyPressed[Vx]) m_InternalRegisters[InternalRegisters::PC] += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 			}
 		}
@@ -352,38 +358,38 @@ void Chip8::emulate_op()
 				// 0xFx07
 				case 0x07: // getdelay Vx
 					Vx = m_DelayTimer;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0xFx0A
 				case 0x0A: // waitkey Vx
 					m_AwaitingKey = 0x80 | x;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0xFx15
 				case 0x15: // setdelay Vx
 					m_DelayTimer = Vx;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0xFx18
 				case 0x18: // setsound Vx
 					m_SoundTimer = Vx;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0xFx1E
 				case 0x1E: // mov I, Vx
-					I += Vx;
-					VF = (I+Vx > 0xff);
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::IR] += Vx;
+					VF = (m_InternalRegisters[InternalRegisters::IR] + Vx > 0xff);
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0xFx29
 				case 0x29: // spritei I, Vx
-					I = 5 * Vx;
-					PC += 2;
+					m_InternalRegisters[InternalRegisters::IR] = 5 * Vx;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0xFx33
@@ -394,29 +400,32 @@ void Chip8::emulate_op()
 					b = tmp%10, tmp/=10;
 					a = tmp;
 
-					m_Memory[I] = a, m_Memory[I+1] = b, m_Memory[I+2] = c;
-					PC += 2;
+					m_Memory[m_InternalRegisters[InternalRegisters::IR]] = a;
+					m_Memory[m_InternalRegisters[InternalRegisters::IR] + 1] = b;
+					m_Memory[m_InternalRegisters[InternalRegisters::IR] + 2] = c;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 
 				// 0xFx55
 				case 0x55: { // mov [I], V0-VF
-					byte *memv = &m_Memory[I];
+					byte *memv = &m_Memory[m_InternalRegisters[InternalRegisters::IR]];
 
 					for (int p = 0; p <= x; ++p)
-						*(memv++) = V[p];
+						*(memv++) = m_GeneralRegisters[p];
 
-					I += x+1, PC += 2;
+					m_InternalRegisters[InternalRegisters::IR] += x + 1;
+					m_InternalRegisters[InternalRegisters::PC] += 2;
 				}
 				break;
 
 				// 0xFx65
 				case 0x65: { // mov V0-VF, [I]
-					byte *memv = &m_Memory[I];
+					byte *memv = &m_Memory[m_InternalRegisters[InternalRegisters::IR]];
 
 					for (int p = 0; p <= x; ++p)
-						V[p] = *(memv++);
+						m_GeneralRegisters[p] = *(memv++);
 
-					I += x+1, PC += 2;
+					m_InternalRegisters[InternalRegisters::IR] += x+1, m_InternalRegisters[InternalRegisters::PC] += 2;
 					break;
 				}
 
@@ -431,16 +440,4 @@ void Chip8::emulate_op()
 	}
 	#undef not_handled
 
-}
-
-
-
-void Chip8::SetDelayTimer(const byte& dt)
-{
-	m_DelayTimer = dt;
-}
-
-void Chip8::SetSoundTimer(const byte& st)
-{
-	m_SoundTimer = st;
 }
