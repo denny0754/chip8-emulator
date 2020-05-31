@@ -77,7 +77,7 @@ private:
 	bool m_ShouldRedraw;
 
 public:
-	
+	Chip8();
 
 	inline byte GetDelayTimer() const { return m_DelayTimer; }
 	
@@ -109,7 +109,7 @@ public:
 
 	std::string disassemble();
 
-	Chip8();
+	std::string decode(int i, byte msb, byte lsb);
 };
 
 
