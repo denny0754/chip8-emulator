@@ -3,11 +3,11 @@ ToDo:
     ✔ Source files should end with the `.cpp` extension instead of the `.cc` one. @done(20-05-28 19:15)
     ✔ Pulic members of `Chip8` class should be private. For some we would need to create a Getter or a Setter or both. @started(20-05-28 19:36) @done(20-05-30 17:14) @lasted(1d21h38m17s)
     ✔ Consider moving all registers of the `Chip8` into an array of registers(i.e. an `std::array` of `word`). @done(20-05-30 17:19)
-    ☐ Use SFML, which is more C++ friendly then SDL.
-    ☐ Consider moving all `Chip8` operations/instructions into some form of methods. `emulate_op` is too long of a method. A map of `int` to `std::function` should do the job.
+    ☐ Use RayLib instead of SDL.
+    ✘ Consider moving all `Chip8` operations/instructions into some form of methods. `emulate_op` is too long of a method. A map of `int` to `std::function` should do the job. @started(20-05-31 20:01) @cancelled(20-06-02 19:15) @wasted(1d23h14m43s)
     ✔ Methods found in `disasseble.cpp` should be moved onto a single file, i.e. `chip8.cpp`. @done(20-05-30 17:25)
-    ☐ Consider using an independent video memory interface with methods used to access the video ram.
+    ☐ Consider using an independent video memory interface with methods used to access the video ram. @started(20-06-02 19:16)
     ✔ Replace c-style array with c++ `std::array`. @done(20-05-30 17:22)
     ✔ Consider making function `decode` found in `disassembled.cpp` a method of the `Chip8` class. @started(20-05-30 17:22) @done(20-05-30 17:25) @lasted(3m31s)
-    ☐ Use the faster library `spdlog` to log error/debug/info messages instead of `cout` or `cerr`.
+    ✔ Use the faster library `spdlog` to log error/debug/info messages instead of `cout` or `cerr`. @started(20-05-31 20:01) @done(20-06-02 19:15) @lasted(1d23h14m17s)
     ☐ Add source and header documentation.

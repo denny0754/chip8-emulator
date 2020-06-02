@@ -16,6 +16,7 @@
 #include <limits>
 #include <sstream>
 #include <random>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 
 static std::array<byte, 80> CHIP8_FONTS =
@@ -49,6 +50,11 @@ Chip8::Chip8()
 	m_InternalRegisters.fill(0);
 	m_InternalRegisters[InternalRegisters::PC] = 0x200;
 	m_Stack.fill(0);
+
+	auto color_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+	m_Logger.reset(new spdlog::logger("CHIP8", color_sink));
+    m_Logger->set_level(spdlog::level::trace);
+    m_Logger->set_pattern("[%T][%l] %n: %^%v%$");
 }
 
 /*
@@ -87,14 +93,14 @@ bool Chip8::load_program(const std::string file)
 	program_size = GetFileSize(file);
 	if(!program_size)
 	{
-		std::cerr << "Error: Program file `" << file << "` is empty.\n";
+		m_Logger->error("Program file '{}' is empty.", file);
 		return false;
 	}
 
 	std::fstream file_buffer = std::fstream(file, std::ios::in | std::ios::binary);
 	if (!file_buffer.good()) 
 	{
-		std::cerr << "Error: Couldn't open `" << file << "`\n";
+		m_Logger->error("Couldn't open '{}'. Not enough permissions.", file);
 		return false;
 	}
 
@@ -114,7 +120,6 @@ bool Chip8::load_program(const std::string file)
 }
 
 
-
 /**
  * Interprete an instruction
  *  a single cycle
@@ -131,8 +136,6 @@ void Chip8::emulate_op()
 	int opcode = (m_Memory[m_InternalRegisters[InternalRegisters::PC]] << 8) | m_Memory[m_InternalRegisters[InternalRegisters::PC]+1];
 	int msb = opcode>>8, lsb = opcode&0xff;
 
-    // printf("(%x) %x %x | m_Registers[Chip8Registers::PC] = %x\n", opcode, m_Memory[m_Registers[Chip8Registers::PC]], m_Memory[m_Registers[Chip8Registers::PC]+1], m_Registers[Chip8Registers::PC]);
-
 	// Get bit-fields from instruction/opcode
 	int u   = (opcode>>12) & 0xF;
 	int x   = (opcode>>8) & 0xF;
@@ -146,7 +149,7 @@ void Chip8::emulate_op()
 	byte &Vy = m_GeneralRegisters[y];
 	byte &VF = m_GeneralRegisters[0xF];
 
-	std::cout << decode(m_InternalRegisters[InternalRegisters::PC], msb, lsb) << "\n";
+	m_Logger->debug("Current Instruction: {}", decode(m_InternalRegisters[InternalRegisters::PC], msb, lsb));
 
 	switch (msb >> 4) {
 		// 0x0e-
@@ -154,9 +157,7 @@ void Chip8::emulate_op()
 			switch (lsb&0xf) {
 				// 0x00e0
 				case 0x0: // clr
-					m_VideoMemory.fill(0);
-					m_ShouldRedraw = true;
-					m_InternalRegisters[InternalRegisters::PC] += 2;
+
 					break;
 
 				// 0x00ee
@@ -446,8 +447,8 @@ void Chip8::emulate_op()
 			not_handled(msb, lsb);
 	}
 	#undef not_handled
-
 }
+
 
 
 /*

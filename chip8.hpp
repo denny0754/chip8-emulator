@@ -10,6 +10,7 @@
 #include <chrono>
 #include <deque>
 #include <unordered_map>
+#include <spdlog/spdlog.h>
 
 using byte = uint8_t;	// 8bits
 using word = uint16_t;	// 16bits
@@ -47,6 +48,7 @@ enum InternalRegisters
 };
 
 
+
 class Chip8 {
 private:
 	std::array<byte, 4096> m_Memory;
@@ -75,6 +77,9 @@ private:
 
 	// Should Redraw
 	bool m_ShouldRedraw;
+
+	// Internal (debug)Logger
+	std::shared_ptr<spdlog::logger> m_Logger;
 
 public:
 	Chip8();
@@ -111,7 +116,6 @@ public:
 
 	std::string decode(int i, byte msb, byte lsb);
 };
-
 
 
 
